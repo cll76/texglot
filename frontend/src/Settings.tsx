@@ -9,6 +9,7 @@ import {
   ShieldCheck,
   ChevronDown,
   ArrowUpRight,
+  Trash2,
 } from "lucide-react";
 import { api, type Settings as Config, type Health } from "./types";
 import ContextGuidance from "./ContextGuidance";
@@ -16,9 +17,13 @@ import { openUpdates } from "./updates";
 import { keepDialogFocus } from "./dialogFocus";
 import {
   normalizedEndpoint,
+  apiFormatFromURL,
+  requestEndpoint,
   providerId,
   type Provider,
   type ProviderId,
+  type APIFormat,
+  type APIProfile,
 } from "./providers";
 import qwenIcon from "./assets/providers/qwen.svg";
 import deepseekIcon from "./assets/providers/deepseek.svg";
@@ -51,32 +56,39 @@ export default function Settings({
     [message, setMessage] = useState(""),
     [error, setError] = useState("");
   const [providers, setProviders] = useState<Provider[]>([]);
+  const [profiles, setProfiles] = useState<APIProfile[]>([]);
+  const [selectedProfile, setSelectedProfile] = useState(
+    value.api_profile_id || "",
+  );
+  const [profileName, setProfileName] = useState("");
   const [selectedProvider, setSelectedProvider] = useState<ProviderId>(
     providerId(value.base_url),
   );
   const drafts = useRef<Partial<Record<ProviderId, Config>>>({});
   const provider = providers.find((p) => p.id === selectedProvider);
   const isDeepL = providerId(form.base_url) === "deepl";
-  const savedKey =
-    (value.has_api_key &&
-      normalizedEndpoint(form.base_url) ===
-        normalizedEndpoint(value.base_url)) ||
-    providers.some(
-      (p) =>
-        p.has_api_key &&
-        normalizedEndpoint(p.base_url) === normalizedEndpoint(form.base_url),
-    );
+  const savedKey = !!form.has_api_key && !form.clear_api_key;
   const ready = !!form.base_url.trim() && (isDeepL || !!form.model.trim());
   const chooseProvider = (next: Provider) => {
     if (next.id === selectedProvider) return;
     drafts.current[selectedProvider] = form;
-    setForm(
-      drafts.current[next.id] ?? {
-        ...form,
-        base_url: next.base_url,
-        model: next.model,
-        api_key: "",
-      },
+    const nextForm = drafts.current[next.id] ?? {
+      ...form,
+      base_url: next.base_url,
+      api_format: next.api_format,
+      api_profile_id: "",
+      deepl_source_language: next.deepl_source_language || "",
+      deepl_glossary_id: next.deepl_glossary_id || "",
+      model: next.model,
+      api_key: "",
+      has_api_key: next.has_api_key,
+      clear_api_key: !next.has_api_key,
+      provider: next.id,
+    };
+    setForm(nextForm);
+    setSelectedProfile(nextForm.api_profile_id || "");
+    setProfileName(
+      profiles.find((p) => p.id === nextForm.api_profile_id)?.name || "",
     );
     setSelectedProvider(next.id);
     setMessage("");
@@ -95,11 +107,111 @@ export default function Settings({
       mounted = false;
     };
   }, []);
+  useEffect(() => {
+    let mounted = true;
+    api<APIProfile[]>("/profiles")
+      .then((items) => {
+        if (!mounted) return;
+        setProfiles(items);
+        setProfileName(
+          items.find((p) => p.id === value.api_profile_id)?.name || "",
+        );
+      })
+      .catch((e) => {
+        if (mounted) setError(e.message);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+  const chooseProfile = (id: string) => {
+    const profile = profiles.find((p) => p.id === id);
+    if (!profile) return;
+    setSelectedProfile(id);
+    setProfileName(profile.name);
+    setSelectedProvider(providerId(profile.base_url));
+    setForm((f) => ({
+      ...f,
+      base_url: profile.base_url,
+      api_format: profile.api_format,
+      model: profile.model,
+      concurrency: profile.concurrency,
+      temperature: profile.temperature,
+      timeout: profile.timeout,
+      deepl_source_language: profile.deepl_source_language || "",
+      deepl_glossary_id: profile.deepl_glossary_id || "",
+      api_profile_id: id,
+      api_key: "",
+      has_api_key: profile.has_api_key,
+      clear_api_key: false,
+      provider: undefined,
+    }));
+    setMessage("");
+    setError("");
+  };
+  const saveProfile = async (asNew = false) => {
+    setBusy("profile");
+    setError("");
+    setMessage("");
+    try {
+      const id = asNew ? "" : selectedProfile;
+      const profile = await api<APIProfile>(
+        id ? `/profiles/${id}` : "/profiles",
+        {
+          method: id ? "PUT" : "POST",
+          body: JSON.stringify({ name: profileName, settings: form }),
+        },
+      );
+      setProfiles((items) => [
+        ...items.filter((p) => p.id !== profile.id),
+        profile,
+      ]);
+      setSelectedProfile(profile.id);
+      setProfileName(profile.name);
+      setForm((f) => ({
+        ...f,
+        api_profile_id: profile.id,
+        has_api_key: profile.has_api_key,
+        provider: undefined,
+      }));
+      setMessage(t("API 配置已保存"));
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy("");
+    }
+  };
+  const deleteProfile = async () => {
+    if (!selectedProfile || !window.confirm(t("删除这份已保存的 API 配置？")))
+      return;
+    setBusy("profile");
+    setError("");
+    try {
+      const current = await api<Config>(`/profiles/${selectedProfile}`, {
+        method: "DELETE",
+      });
+      setProfiles((items) => items.filter((p) => p.id !== selectedProfile));
+      setSelectedProfile(current.api_profile_id);
+      setProfileName(
+        profiles.find((p) => p.id === current.api_profile_id)?.name || "",
+      );
+      setSelectedProvider(providerId(current.base_url));
+      setForm({ ...current, api_key: "", clear_api_key: false });
+      setMessage(t("API 配置已删除"));
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy("");
+    }
+  };
   const set = (key: keyof Config, v: string | number | boolean) => {
     setForm((f) => ({
       ...f,
       [key]: v,
-      ...(key === "base_url" ? { api_key: "" } : {}),
+      ...(key === "base_url" && apiFormatFromURL(String(v))
+        ? { api_format: apiFormatFromURL(String(v)) }
+        : {}),
+      ...(key === "api_key" ? { clear_api_key: false } : {}),
     }));
     setMessage("");
     setError("");
@@ -182,6 +294,65 @@ export default function Settings({
         <div className="settings-scroll">
           <fieldset className="connection-settings" disabled={!!busy}>
             <legend className="settings-label">{t("翻译引擎")}</legend>
+            <div className="api-profiles">
+              <label className="field">
+                {t("已保存的 API 配置")}
+                <select
+                  value={selectedProfile}
+                  onChange={(e) => chooseProfile(e.target.value)}
+                >
+                  <option value="" disabled={!!selectedProfile}>
+                    {t("当前配置（未命名）")}
+                  </option>
+                  {profiles.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                {t("配置名称")}
+                <input
+                  value={profileName}
+                  maxLength={80}
+                  onChange={(e) => setProfileName(e.target.value)}
+                  placeholder={t("例如：反代 Chat、反代 Claude")}
+                />
+              </label>
+              <div className="profile-actions">
+                <button
+                  className="secondary small"
+                  disabled={!ready || !profileName.trim()}
+                  onClick={() => void saveProfile()}
+                >
+                  {t(selectedProfile ? "更新 API 配置" : "保存 API 配置")}
+                </button>
+                {selectedProfile && (
+                  <>
+                    <button
+                      className="secondary small"
+                      disabled={!ready || !profileName.trim()}
+                      onClick={() => void saveProfile(true)}
+                    >
+                      {t("另存为新配置")}
+                    </button>
+                    <button
+                      className="icon-button"
+                      title={t("删除 API 配置")}
+                      onClick={() => void deleteProfile()}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </>
+                )}
+              </div>
+              <small>
+                {t(
+                  "配置保存地址、接口类型、模型、密钥及并发、温度和超时设置。选择后点击保存设置生效。",
+                )}
+              </small>
+            </div>
             <div
               className="provider-options"
               role="group"
@@ -197,7 +368,12 @@ export default function Settings({
                 >
                   <span className={`provider-icon ${p.id}`} aria-hidden="true">
                     {providerIcons[p.id] ? (
-                      <img src={providerIcons[p.id]} width={22} height={22} alt="" />
+                      <img
+                        src={providerIcons[p.id]}
+                        width={22}
+                        height={22}
+                        alt=""
+                      />
                     ) : (
                       <Cable size={20} />
                     )}
@@ -316,26 +492,52 @@ export default function Settings({
                 </small>
               </label>
             ) : (
-              <label className="field">
-                {t("服务地址")}
-                <input
-                  type="url"
-                  value={form.base_url}
-                  onChange={(e) => set("base_url", e.target.value)}
-                  placeholder={
-                    provider?.placeholder ?? "https://your-api.example/v1"
-                  }
-                  autoComplete="off"
-                  spellCheck={false}
-                />
-                <small>
-                  {t(
-                    selectedProvider === "qwen"
-                      ? "从百炼 API Key 页面复制 OpenAI 兼容地址，须与密钥的业务空间和地域一致。"
-                      : "填写接口根地址，可包含 /v1，不需要 /chat/completions。",
+              <>
+                <label className="field">
+                  {t("接口类型")}
+                  <select
+                    value={form.api_format}
+                    onChange={(e) =>
+                      set("api_format", e.target.value as APIFormat)
+                    }
+                  >
+                    <option value="chat_completions">
+                      Chat Completions (/chat/completions)
+                    </option>
+                    <option value="messages">
+                      Anthropic Messages (/messages)
+                    </option>
+                  </select>
+                </label>
+                <label className="field">
+                  {t("服务地址")}
+                  <input
+                    type="url"
+                    value={form.base_url}
+                    onChange={(e) => set("base_url", e.target.value)}
+                    placeholder={
+                      provider?.placeholder ?? "https://your-api.example/v1"
+                    }
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                  <small>
+                    {t(
+                      selectedProvider === "qwen"
+                        ? "从百炼 API Key 页面复制 OpenAI 兼容地址，须与密钥的业务空间和地域一致。"
+                        : "填写接口根地址，例如 http://localhost:11434/v1。也支持粘贴完整接口地址。",
+                    )}
+                  </small>
+                  {form.base_url.trim() && (
+                    <small className="request-endpoint">
+                      {t("实际请求地址：")}
+                      <code>
+                        {requestEndpoint(form.base_url, form.api_format)}
+                      </code>
+                    </small>
                   )}
-                </small>
-              </label>
+                </label>
+              </>
             )}
             <label className="field">
               <span className="key-label">

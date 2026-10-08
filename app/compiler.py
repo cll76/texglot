@@ -61,6 +61,24 @@ PIXEL_COMPATIBILITY = r"""% texglot: pdfTeX pixel dimensions for XeTeX
 
 
 XETEX_COMPATIBILITY = r"""% texglot: native XeTeX font and PDF-driver capabilities
+% flexisym replaces unicode-math's math strut with a legacy symbol lookup.
+% Preserve the engine's existing definition when both packages are loaded.
+\makeatletter
+\AddToHook{package/flexisym/before}{%
+\@ifpackageloaded{unicode-math}{\let\TeXGlotUnicodeMathstrut\resetMathstrut@}{}%
+}
+\AddToHook{package/flexisym/after}{%
+\ifdefined\TeXGlotUnicodeMathstrut
+\let\resetMathstrut@\TeXGlotUnicodeMathstrut
+% flexisym's legacy slots 0F (bullet) and 00 (minus) are not Unicode glyphs.
+% Set these after unicode-math has initialized the document's chosen font.
+\AddToHook{begindocument/end}{%
+\Umathchardef\bullet=2 \symoperators "2219\relax
+\Umathcode`\-=2 \symoperators "2212\relax
+}%
+\fi
+}
+\makeatother
 \AddToHook{package/microtype/after}{%
 \DeclareMicrotypeSet{texglot-native}{encoding={TU,EU1,EU2}}%
 \UseMicrotypeSet[protrusion]{texglot-native}%
@@ -1580,7 +1598,7 @@ async def _compile_document(
             "-file-line-error",
             "-recorder",
             f"-output-directory={out}",
-            str(path),
+            path.name,
         ]
     env = {
         k: v
@@ -1638,6 +1656,10 @@ async def _compile_document(
         logs.append(log)
         (out / "compile.log").write_text("\n".join(logs), encoding="utf-8")
         if proc.returncode:
+            if "sandbox-exec: sandbox_apply: Operation not permitted" in log:
+                raise ValueError(
+                    "当前启动环境不允许 macOS 编译沙箱，请在系统终端中启动 TeXGlot 后重试"
+                )
             hints = []
             for line in log.splitlines():
                 if re.search(

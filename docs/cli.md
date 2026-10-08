@@ -23,12 +23,15 @@ Windows 双击仓库中的 `install-texglot.cmd`；原生 PowerShell 和 CMD 均
 texglot https://arxiv.org/abs/1706.03762
 texglot 1706.03762 -o ~/Documents/Papers
 texglot ./paper.tex
+texglot ./paper.pdf --language zh
 texglot ./project.zip --main main.tex --language zh
 ```
 
-支持 arXiv 摘要链接、PDF 链接、ID，以及 `.tex`、`.zip`、`.tar`、`.tar.gz`、`.tgz`、`.gz` 文件。多文件项目请将图片、参考文献、模板一起打包。文件名包含空格时使用引号。Windows 示例：`texglot "C:\Papers\论文.tex" -o "D:\Translated Papers"`。
+支持 arXiv 摘要链接、PDF 链接、ID，以及 `.pdf`、`.tex`、`.zip`、`.tar`、`.tar.gz`、`.tgz`、`.gz` 文件。多文件项目请将图片、参考文献、模板一起打包。文件名包含空格时使用引号。Windows 示例：`texglot "C:\Papers\论文.tex" -o "D:\Translated Papers"`。
 
 翻译目标使用已保存的设置；`--language zh` / `zh-TW` / `en` 可指定简体中文、繁体中文或英文。`--locale en` 仅改变 CLI 提示语言。
+
+本地 PDF 输入保持原页面尺寸和页数，尽量保留图片、图形和公式；翻译失败或放不下的文本区域保留原文并报告 `partial`。扫描版需要先做 OCR，PDF 无需 TeX 编译器，也不导出 LaTeX 源码。
 
 ## 上下文引导
 
@@ -124,7 +127,22 @@ texglot --configure --provider qwen
 texglot --show-config
 ```
 
-无参数的 `--configure` 会交互式询问地址、模型和隐藏输入的密钥。脚本可用 `--key-env` 从已设置的环境变量读取密钥，避免把密钥写进命令参数。`--show-config` 只显示密钥是否存在。`--provider` 可选 `qwen`、`deepseek`、`deepl`、`custom`，仅用于 `--configure`。Qwen 预设模型为 `qwen3.8-flash`，首次配置必须填写百炼控制台提供的 OpenAI 兼容地址；以上工作空间 ID 需要替换为实际值。更换 API 地址时不会沿用旧服务密钥；已保存的相同地址可恢复自己的密钥，同地址留空保留。`--configure --clear-key` 清除当前地址保存的密钥，其他服务的配置不受影响。本地无鉴权模型可以留空。
+无参数的 `--configure` 会交互式询问地址、模型和隐藏输入的密钥。脚本可用 `--key-env` 从已设置的环境变量读取密钥，避免把密钥写进命令参数。`--show-config` 只显示密钥是否存在。`--provider` 可选 `qwen`、`deepseek`、`deepl`、`custom`，仅用于 `--configure`。Qwen 预设模型为 `qwen3.8-flash`，首次配置必须填写百炼控制台提供的 OpenAI 兼容地址；以上工作空间 ID 需要替换为实际值。手动修改当前配置的地址时保留已有密钥，留空可继续使用；切换服务商或已保存的 API 配置时加载各自的密钥。`--configure --clear-key` 清除当前地址保存的密钥，其他服务的配置不受影响。本地无鉴权模型可以留空。
+
+自定义服务的 `--base-url` 支持 HTTP 与 HTTPS：填 `/v1` 根地址或完整 `/chat/completions` 地址时使用 Chat Completions 协议，填完整 `/messages` 地址时使用 Anthropic Messages 协议。例如：
+
+```bash
+texglot --configure --provider custom \
+  --base-url http://proxy.example:23000/v1/messages \
+  --model YOUR_MODEL --key-env MODEL_API_KEY --test
+```
+
+也可以填写根地址并用 `--api-format chat_completions` 或 `--api-format messages` 明确选择接口。网页中命名保存的 API 配置可通过名称或 ID 切换：
+
+```bash
+texglot --configure --base-url http://proxy.example:23000/v1 --api-format messages
+texglot --configure --api-profile "反代 Claude"
+```
 
 DeepL 无需 `--model`。可用 `--deepl-source-language EN --deepl-glossary-id YOUR_GLOSSARY_ID` 配置已有 DeepL 术语表；传空字符串可清除对应设置。DeepL 按字符统计用量，批次 JSON 中的 `characters` 是任务累计用量；`characters_estimated` 标记服务没有返回计费字符数时的估算，`tokens` 保留给 LLM。切换引擎、源语言或术语表会区分段落缓存；已完成的整篇译文仍可按文献库复用规则打开。
 

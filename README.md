@@ -26,6 +26,12 @@ https://github.com/user-attachments/assets/0f7d9dbb-3daf-412e-b3db-6f328421c396
 
 **TeXGlot** takes an arXiv link or a LaTeX project, translates its prose with your configured language model, and compiles a translated PDF. Equations, citations, figures and document structure are protected throughout the process. The translated LaTeX project remains available for editing.
 
+Local text PDFs are also supported. Translations are fitted into the original text regions, retaining page count, images, vector graphics and standalone formulas. Inline formulas are protected as images. Text can shrink moderately; failed translations or text that cannot fit stay unchanged with a warning. Scans need OCR first. Check complex formula fonts and layouts in the result. PDF inputs need no TeX compiler and do not produce LaTeX source.
+
+PDF progress counts translatable text regions, including headings and captions outside figures. Labels, axes and legends inside bitmap or vector illustrations stay unchanged, are not sent to the model and do not count toward translation progress. Detected prose continuations across pages or columns are translated together with whole-paragraph context and reconstructed broken words, then fitted back into their original regions. Running headers do not join prose; headings, captions and references remain separate. Resuming an older job retranslates changed paragraph groups and reuses valid caches for unchanged standalone regions.
+
+Inline bold headings and the body text beside them are reconstructed as one physical line before grouping paragraphs, avoiding fragmented sentences and overlapping translations. Sentences can continue below page-top figures and captions. Display formulas stay unchanged and supply read-only context to surrounding text.
+
 The name combines **TeX + Polyglot**. The browser interface and CLI use the same local library, queue and translation cache. No TeXGlot account or hosted backend is required. Model requests go to the API endpoint you choose.
 
 ## Features
@@ -33,7 +39,8 @@ The name combines **TeX + Polyglot**. The browser interface and CLI use the same
 | | What you can do |
 | :--- | :--- |
 | **Source to PDF** | Import arXiv links/IDs or `.tex`, `.zip`, `.tar`, `.tar.gz`, `.tgz`, `.gz` projects. Download the translated PDF, original PDF and translated source ZIP. |
-| **Your model** | Use DeepL, Qwen / Alibaba Model Studio, DeepSeek, or a compatible Chat Completions endpoint, including a local model service. |
+| **Local PDF** | Use an LLM API to upload a PDF with extractable text in **Local file**, preserving layout, images and formulas where possible. Download the translation or read it beside the original. DeepL supports arXiv / LaTeX sources. |
+| **Your model** | Use DeepL, Qwen / Alibaba Model Studio, DeepSeek, or a compatible Chat Completions or Anthropic Messages endpoint, including reverse proxies and local model services. |
 | **Context guidance** | Optionally use the paper's abstract to guide terminology. On by default; independently selectable for each task in the GUI and CLI. |
 | **Reading workspace** | Read original, translation or both; swap sides, scroll continuously, synchronize by shared content landmarks, search the full PDF with Cmd/Ctrl+F, zoom and resume your reading position. |
 | **Local annotations** | Highlight, underline and add notes. Search and manage annotations in a sidebar; exported PDFs stay free of TeXGlot annotations. |
@@ -101,10 +108,11 @@ Open **TeXGlot** (or **http://127.0.0.1:8765** for a source installation), choos
 | Qwen / Alibaba Model Studio | `qwen3.8-flash` | Copy the **OpenAI-compatible** endpoint from your workspace's API Key page. It must match the key's region and workspace. |
 | DeepSeek V4.1 Flash | `deepseek-flash` | `https://api.deepseek.com` |
 | DeepL | No model name needed | `https://api.deepl.com`; legacy Free keys automatically use the Free endpoint. |
-| Custom / local | Your installed or available model | For example, `http://localhost:11434/v1` for Ollama. A local endpoint without authentication can use an empty key. |
+| Custom / proxy / local | Your installed or available model | HTTP and HTTPS are supported. Enter the base URL (including `/v1` if needed) and select Chat Completions or Anthropic Messages. Full endpoint URLs are also accepted. For example, `http://localhost:11434/v1` for Ollama. A local endpoint without authentication can use an empty key. |
 
 Presets are editable. Model availability and billing depend on your provider account. Qwen requests disable thinking by default. Refer to the [Qwen quick start](https://help.aliyun.com/zh/model-studio/first-api-call-to-qwen) or [DeepSeek documentation](https://api-docs.deepseek.com/) for credentials and endpoint details.
 
+Choose Chat Completions or Anthropic Messages in **API protocol**; the request URL appears below the endpoint. Name and save API profiles, including multiple profiles for the same address with different protocols, models or keys. Select a profile and click **Save settings** to apply it. Profiles can be updated, copied or deleted. Editing the endpoint retains the key you entered or saved.
 
 DeepL uses its own **DeepL API key** and does not require an LLM account. Select DeepL, test the connection and save; usage is shown in characters. TeXGlot protects and validates formulas, citations and formatting. Optionally provide a DeepL glossary ID and its source language; existing free-form LLM terminology preferences are retained. See [DeepL API authentication](https://developers.deepl.com/docs/getting-started/auth) for API account requirements.
 
@@ -164,7 +172,7 @@ For installation, translation, reading controls and troubleshooting, see the **[
 ## Data and privacy
 
 - Source installations store settings, tasks, caches and annotations in **`data/`**; desktop and standalone wheel installations use **`~/.texglot/`**. `TEXGLOT_DATA_DIR` overrides the location. Back up this directory before moving or upgrading an installation.
-- API keys are stored locally, **not encrypted at rest**. Configuration files use owner-only permissions on macOS/Linux and the containing user's ACL on Windows. API responses do not expose saved keys. A new API address does not inherit another address's key.
+- API keys are stored locally, **not encrypted at rest**. Configuration files use owner-only permissions on macOS/Linux and the containing user's ACL on Windows. API responses do not expose saved keys. Editing a connection's address preserves its key; switching saved profiles loads each profile's own key.
 - Translation paragraphs, optional abstract context and your glossary are sent to your chosen model service. Source processing, compilation and annotation storage run locally. Use a local model endpoint if the text must remain on your machine.
 - The service binds to loopback. It is a personal local application, not an authenticated multi-user server. macOS uses an OS compilation sandbox; Windows/Linux do not yet provide equivalent OS-level file isolation. Use trusted LaTeX sources.
 

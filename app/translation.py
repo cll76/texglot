@@ -15,7 +15,8 @@ def Translator(settings):
 def cache_settings(settings, context):
     values = {
         "version": PROMPT_VERSION,
-        "base": settings.base_url,
+        "base": settings.base_url
+        + ("/messages" if settings.api_format == "messages" else ""),
         "model": settings.model,
         "language": settings.target_language,
         "glossary": settings.glossary,

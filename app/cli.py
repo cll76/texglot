@@ -27,7 +27,7 @@ LANGUAGES = {
     "zh-TW": "繁體中文",
     "en": "English",
 }
-SUFFIXES = (".tex", ".zip", ".tar", ".tar.gz", ".tgz", ".gz")
+SUFFIXES = (".tex", ".zip", ".tar", ".tar.gz", ".tgz", ".gz", ".pdf")
 MAX_UPLOAD = 80 * 1024 * 1024
 
 
@@ -38,7 +38,7 @@ class CLIError(Exception):
 def parser():
     p = argparse.ArgumentParser(
         prog="texglot",
-        description="TeXGlot · arXiv / LaTeX → translated PDF · 本地论文翻译",
+        description="TeXGlot · arXiv / PDF / LaTeX → translated PDF · 本地论文翻译",
         epilog="Examples:\n  texglot https://arxiv.org/abs/1706.03762\n  texglot paper.tex project.zip -o ./papers\n  texglot --batch papers.txt --language zh\n  texglot --resume TASK_ID\n  texglot --configure --model deepseek-flash --key-env DEEPSEEK_API_KEY",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -46,7 +46,7 @@ def parser():
         "inputs",
         nargs="*",
         metavar="SOURCE",
-        help="arXiv link/ID or local source file · 链接、ID 或源码",
+        help="arXiv link/ID, local PDF or LaTeX source · 链接、ID、PDF 或源码",
     )
     p.add_argument(
         "-b",
@@ -133,8 +133,17 @@ def parser():
         action="store_true",
         help="show settings without exposing the API key",
     )
-    p.add_argument("--base-url", help="API base URL (with --configure)")
+    p.add_argument(
+        "--base-url",
+        help="API base URL or full /chat/completions or /messages endpoint (with --configure)",
+    )
     p.add_argument("--model", help="model name (with --configure)")
+    p.add_argument(
+        "--api-format",
+        choices=("chat_completions", "messages"),
+        help="API protocol (with --configure)",
+    )
+    p.add_argument("--api-profile", help="saved API profile ID (with --configure)")
     p.add_argument(
         "--provider",
         choices=("qwen", "deepseek", "deepl", "custom"),
@@ -339,10 +348,12 @@ def submit(service, source, language, main="", context_guidance=None):
     if path.is_file():
         if not path.name.lower().endswith(SUFFIXES):
             raise CLIError(
-                "Unsupported source file. Use .tex, .zip, .tar, .tar.gz, .tgz, or .gz."
+                "Unsupported input file. Use .pdf, .tex, .zip, .tar, .tar.gz, .tgz, or .gz."
             )
         if not 0 < path.stat().st_size <= MAX_UPLOAD:
             raise CLIError("File is empty or exceeds 80 MB")
+        if path.suffix.lower() == ".pdf" and main:
+            raise CLIError("PDF input does not use a LaTeX main file")
         with path.open("rb") as file:
             return service.request(
                 "POST",
@@ -383,11 +394,14 @@ def configure(service, args):
         "provider",
         "base_url",
         "model",
+        "api_format",
         "deepl_source_language",
         "deepl_glossary_id",
     ):
         if getattr(args, key) is not None:
             values[key] = getattr(args, key)
+    if args.api_profile:
+        values["api_profile_id"] = args.api_profile
     if args.key_env:
         key = os.environ.get(args.key_env, "").strip()
         if not key:

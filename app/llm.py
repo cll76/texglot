@@ -240,27 +240,42 @@ class Translator:
         self, messages: list[dict], max_tokens=7000, *, json_output=False
     ) -> str:
         s = self.settings
+        messages_api = s.api_format == "messages"
         body = {
             "model": s.model,
-            "messages": messages,
+            "messages": (
+                [message for message in messages if message["role"] != "system"]
+                if messages_api
+                else messages
+            ),
             "temperature": s.temperature,
             "max_tokens": max_tokens,
             "stream": False,
         }
-        provider = provider_for_url(s.base_url)
-        if provider == "deepseek":
-            body["thinking"] = {"type": "disabled"}
-        elif provider == "qwen" and s.model.lower().startswith("qwen"):
-            body["enable_thinking"] = False
-        if json_output and provider in ("deepseek", "qwen"):
-            body["response_format"] = {"type": "json_object"}
-        headers = {"Authorization": f"Bearer {s.api_key}"} if s.api_key else {}
+        if messages_api:
+            system = "\n\n".join(
+                message["content"] for message in messages if message["role"] == "system"
+            )
+            if system:
+                body["system"] = system
+            endpoint = s.base_url + "/messages"
+            headers = {"anthropic-version": "2023-06-01"}
+            if s.api_key:
+                headers["x-api-key"] = s.api_key
+        else:
+            provider = provider_for_url(s.base_url)
+            if provider == "deepseek":
+                body["thinking"] = {"type": "disabled"}
+            elif provider == "qwen" and s.model.lower().startswith("qwen"):
+                body["enable_thinking"] = False
+            if json_output and provider in ("deepseek", "qwen"):
+                body["response_format"] = {"type": "json_object"}
+            endpoint = s.base_url + "/chat/completions"
+            headers = {"Authorization": f"Bearer {s.api_key}"} if s.api_key else {}
         for attempt in range(3):
             try:
                 self.requests += 1
-                response = await self.client.post(
-                    s.base_url + "/chat/completions", headers=headers, json=body
-                )
+                response = await self.client.post(endpoint, headers=headers, json=body)
                 code = response.status_code
                 if code in (401, 403):
                     raise ProviderError(
@@ -293,21 +308,39 @@ class Translator:
                 # only input/output counts. Accounting must not discard text.
                 usage = data.get("usage")
                 if isinstance(usage, dict):
-                    try:
-                        count = int(usage.get("total_tokens", 0))
-                    except (TypeError, ValueError, OverflowError):
-                        count = 0
-                    self.tokens += max(0, count)
-                if not isinstance(data.get("choices"), list):
-                    raise TypeError("Completion choices must be an array")
-                choice = data["choices"][0]
-                if not isinstance(choice, dict) or not isinstance(
-                    choice.get("message"), dict
-                ):
-                    raise TypeError("Completion message must be an object")
-                if choice.get("finish_reason") == "length":
-                    raise ValueError("模型输出被截断")
-                content = choice["message"].get("content")
+                    fields = (
+                        ("input_tokens", "output_tokens")
+                        if messages_api
+                        else ("total_tokens",)
+                    )
+                    for field in fields:
+                        try:
+                            count = int(usage.get(field, 0))
+                        except (TypeError, ValueError, OverflowError):
+                            count = 0
+                        self.tokens += max(0, count)
+                if messages_api:
+                    if data.get("stop_reason") == "max_tokens":
+                        raise ValueError("模型输出被截断")
+                    blocks = data.get("content")
+                    if not isinstance(blocks, list) or not all(
+                        isinstance(block, dict) for block in blocks
+                    ):
+                        raise TypeError("Messages content must be an array of blocks")
+                    content = "".join(
+                        block["text"] for block in blocks if block.get("type") == "text"
+                    )
+                else:
+                    if not isinstance(data.get("choices"), list):
+                        raise TypeError("Completion choices must be an array")
+                    choice = data["choices"][0]
+                    if not isinstance(choice, dict) or not isinstance(
+                        choice.get("message"), dict
+                    ):
+                        raise TypeError("Completion message must be an object")
+                    if choice.get("finish_reason") == "length":
+                        raise ValueError("模型输出被截断")
+                    content = choice["message"].get("content")
                 if not isinstance(content, str) or not content.strip():
                     raise ValueError("模型没有返回有效文本")
                 return content.strip()
@@ -320,7 +353,9 @@ class Translator:
                 ) from None
             except (KeyError, IndexError, TypeError, json.JSONDecodeError):
                 raise ProviderError(
-                    "API 返回格式不兼容，需要 Chat Completions 接口"
+                    "API 返回格式不兼容，需要 Messages 接口"
+                    if messages_api
+                    else "API 返回格式不兼容，需要 Chat Completions 接口"
                 ) from None
         raise ProviderError("模型请求失败")
 
@@ -640,7 +675,7 @@ class Translator:
                     "content": "Translate 'The experiment confirms the hypothesis.' into simplified Chinese. Return just the translation.",
                 }
             ],
-            max_tokens=150,
+            max_tokens=512,
         )
         return {
             "ok": True,

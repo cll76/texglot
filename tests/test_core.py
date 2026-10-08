@@ -298,7 +298,7 @@ def test_safe_custom_prose_macros():
     assert "norm" not in items[0].masked
 
 
-def test_keys_are_bound_to_their_endpoint():
+def test_editing_current_connection_retains_its_key():
     from app.config import merge_settings
 
     config = Settings(api_key="private-key")
@@ -310,7 +310,7 @@ def test_keys_are_bound_to_their_endpoint():
         merge_settings(
             config, {"base_url": "http://localhost:11434/v1", "api_key": ""}
         ).api_key
-        == ""
+        == "private-key"
     )
     assert (
         merge_settings(
@@ -401,8 +401,18 @@ def test_endpoint_normalization():
         Settings(base_url="https://api.deepseek.com/v1/chat/completions/").base_url
         == "https://api.deepseek.com/v1"
     )
-    with pytest.raises(ValueError):
-        Settings(base_url="http://example.org/v1")
+    assert (
+        Settings(base_url=" http://192.0.2.10:23000/v1/chat/completions/ ").base_url
+        == "http://192.0.2.10:23000/v1"
+    )
+    assert (
+        Settings(base_url=" http://192.0.2.10:23000/v1/messages/ ").base_url
+        == "http://192.0.2.10:23000/v1"
+    )
+    assert (
+        Settings(base_url="http://proxy.example/v1/messages").api_format == "messages"
+    )
+    assert Settings(base_url="http://proxy.example/v1").api_format == "chat_completions"
 
 
 def test_included_file_comment_and_shared_math_aliases():

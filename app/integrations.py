@@ -181,6 +181,7 @@ def _decode_latex(source: ZoteroSource) -> tuple[bytes, str]:
 def _settings_fingerprint(language: str, context_guidance: bool) -> str:
     settings = load_settings()
     values = public_settings(settings)
+    values.pop("api_profile_id", None)
     values.update(
         target_language=language,
         context_guidance=context_guidance,

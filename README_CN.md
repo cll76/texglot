@@ -26,6 +26,12 @@ https://github.com/user-attachments/assets/c77fea68-7ade-4027-8ef2-7198465390d7
 
 **TeXGlot** 将 arXiv 链接或 LaTeX 工程中的正文交给你配置的大模型翻译，保护公式、引用、图片和文档结构，再编译为译后 PDF。译后的 LaTeX 工程也可下载，方便继续编辑。
 
+也支持上传本地文字 PDF：在原页面的文本区域排版译文，保留页数、图片、图形和独立公式。行内公式以原图保护；译文允许适度缩小字号，放不下或翻译校验失败时保留原文并提示。扫描版需先做 OCR，复杂公式字体和排版仍需检查译后效果。PDF 输入无需 TeX 编译器，也不生成 LaTeX 源码。
+
+PDF 进度只统计需要翻译的文本块，标题和图外图注也单独计数。图片及矢量图区域中的标签、坐标轴和图例保留原文，不送给模型，也不计入进度。检测到连续的跨页或跨栏正文时，同一请求结合完整段落翻译，并处理边界断词；译文仍分别写回原文本区域。页眉不参与正文连接，标题、图注和参考文献独立处理。继续旧任务时，新的段落组合重新翻译，未变化的独立块沿用有效缓存。
+
+行内粗体小标题与同行正文先按实际位置合成完整文字行，再组织段落，避免字体切换造成半句翻译和重叠排版。跨页续句可越过页顶图片及图注；正文中的独立公式保留原样，并作为相邻文字的只读上下文。
+
 名称来自 **TeX + Polyglot**。网页和 CLI 共用本机文献库、任务队列与译文缓存，无需注册 TeXGlot 账号或连接 TeXGlot 云端。模型请求发送到你选择的 API 服务。
 
 ## 功能
@@ -33,7 +39,8 @@ https://github.com/user-attachments/assets/c77fea68-7ade-4027-8ef2-7198465390d7
 | | 可以做什么 |
 | :--- | :--- |
 | **源码到 PDF** | 导入 arXiv 链接、ID 或 `.tex`、`.zip`、`.tar`、`.tar.gz`、`.tgz`、`.gz` 工程，下载译文 PDF、原文 PDF 和译后源码 ZIP。 |
-| **自选模型** | 支持 DeepL、Qwen / 阿里云百炼、DeepSeek，以及兼容 Chat Completions 的服务，包括本地模型。 |
+| **本地 PDF** | 使用大模型接口，在「本地文件」中上传可提取文字的 PDF，尽量保留原版式、图片和公式，下载译文并对照阅读。DeepL 用于 arXiv / LaTeX 源码翻译。 |
+| **自选模型** | 支持 DeepL、Qwen / 阿里云百炼、DeepSeek，以及兼容 Chat Completions 或 Anthropic Messages 的服务，包括反代和本地模型。 |
 | **上下文引导** | 可用论文摘要辅助理解主题与术语，初始默认开启；每项任务都可在界面或 CLI 独立选择。 |
 | **论文阅读** | 原文、译文和左右对照，左右互换、连续纵向阅读，按共同内容定位点同步滚动，Cmd/Ctrl+F 搜索整份 PDF，缩放并恢复阅读位置。 |
 | **本地批注** | 高亮、下划线和便签，通过侧栏搜索与管理；导出的 PDF 不附带 TeXGlot 批注。 |
@@ -101,10 +108,11 @@ bash start-texglot.command
 | Qwen / 阿里云百炼 | `qwen3.8-flash` | 从业务空间的 API Key 页面复制 **OpenAI 兼容地址**，须与密钥的地域和业务空间一致。 |
 | DeepSeek V4.1 Flash | `deepseek-flash` | `https://api.deepseek.com` |
 | DeepL | 无需填写模型 | `https://api.deepl.com`；旧版 Free key 自动使用 Free 接口。 |
-| 自定义 / 本地模型 | 已安装或有权限使用的模型 | 例如 Ollama 的 `http://localhost:11434/v1`；本地无鉴权服务可以不填密钥。 |
+| 自定义 / 反代 / 本地模型 | 已安装或有权限使用的模型 | 支持 HTTP 与 HTTPS。填写 `/v1` 根地址并选择 Chat Completions 或 Anthropic Messages 接口类型，也支持粘贴完整接口地址。例如 Ollama 的 `http://localhost:11434/v1`；本地无鉴权服务可以不填密钥。 |
 
 预设均可修改，模型权限和费用由服务商账户决定。Qwen 请求默认关闭深度思考。密钥与接口信息可参考 [千问首次调用](https://help.aliyun.com/zh/model-studio/first-api-call-to-qwen) 和 [DeepSeek 文档](https://api-docs.deepseek.com/zh-cn/)。
 
+「接口类型」可选择 Chat Completions 或 Anthropic Messages，下方显示实际请求地址。填写配置名称并点击「保存 API 配置」可保存多份连接，支持同一地址使用不同接口、模型或密钥；切换配置后点击「保存设置」生效。已有配置可更新、另存为或删除。手动编辑地址时保留正在输入或已保存的密钥。
 
 DeepL 使用独立的 **DeepL API key**，无需同时配置 LLM。选择 DeepL 后直接测试连接并保存；用量按字符显示。公式、引用和格式由 TeXGlot 保护并校验。可选填写 DeepL 术语表 ID（需指定匹配的源语言），原有 LLM 的自由文本术语偏好仍会保留。API 账号与网页会员的区别见 [DeepL API 文档](https://developers.deepl.com/docs/getting-started/auth)。
 
@@ -164,7 +172,7 @@ texglot --serve                             # 前台运行本地网页服务
 ## 数据与隐私
 
 - 源码安装的数据保存在 **`data/`**，桌面版与独立 wheel 安装保存在 **`~/.texglot/`**。环境变量 `TEXGLOT_DATA_DIR` 可修改位置。迁移或升级前请备份该目录。
-- API 密钥保存在本地，**未做静态加密**。macOS/Linux 配置文件仅允许文件所有者读写，Windows 依赖所在用户目录的 ACL。API 响应不返回已保存密钥，新地址也不会继承其他服务地址的密钥。
+- API 密钥保存在本地，**未做静态加密**。macOS/Linux 配置文件仅允许文件所有者读写，Windows 依赖所在用户目录的 ACL。API 响应不返回已保存密钥。手动编辑当前配置的地址会保留其密钥；切换已保存配置时加载各自的密钥。
 - 当前段落、可选摘要背景和术语表会发送到你选择的模型服务；源码处理、编译和批注保存在本机。需要文本始终留在本机时，可配置本地模型。
 - 服务仅绑定回环地址，是个人本地应用，不是带身份验证的多人服务器。macOS 使用系统编译沙箱，Windows/Linux 尚无同等级的 OS 文件隔离，请使用可信 LaTeX 源码。
 

@@ -134,6 +134,8 @@ class ReaderStore:
                         str(self.root / job["id"] / job["artifacts"]["translated"]),
                         documents["original"]["version"],
                         documents["translated"]["version"],
+                        tuple(job.get("translation_files", [])),
+                        tuple(job.get("source_dependencies", [])),
                     )
                 except (
                     ValueError,

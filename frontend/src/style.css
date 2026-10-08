@@ -2021,6 +2021,22 @@ h1 {
 }
 
 /* Provider settings keep one compact connection form across services. */
+.api-profiles {
+  padding: 0 0 18px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+.api-profiles > .field:first-child { margin-top: 0; }
+.api-profiles > small {
+  display: block;
+  margin-top: 10px;
+  color: #86868b;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.profile-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.profile-actions > .icon-button { margin-left: auto; }
+.request-endpoint code { overflow-wrap: anywhere; }
 .connection-settings {
   border: 0;
   padding: 0;

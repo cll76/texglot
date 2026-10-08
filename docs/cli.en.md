@@ -11,12 +11,15 @@ Run the setup for your [platform](platforms.en.md), then `uv tool update-shell` 
 ```bash
 texglot https://arxiv.org/abs/1706.03762v7
 texglot ./paper.tex
+texglot ./paper.pdf --language zh
 texglot ./project.zip --main main.tex --language zh -o ./translated
 ```
 
-Supported inputs: arXiv abstract/PDF URLs and IDs, `.tex`, `.zip`, `.tar`, `.tar.gz`, `.tgz`, `.gz`. Include figures, bibliography and template files in multi-file archives. Quote paths containing spaces, for example `texglot "C:\Papers\My paper.tex" -o "D:\Translated Papers"` on Windows.
+Supported inputs: arXiv abstract/PDF URLs and IDs, `.pdf`, `.tex`, `.zip`, `.tar`, `.tar.gz`, `.tgz`, `.gz`. Include figures, bibliography and template files in multi-file archives. Quote paths containing spaces, for example `texglot "C:\Papers\My paper.tex" -o "D:\Translated Papers"` on Windows.
 
 `--language zh`, `zh-TW` or `en` selects the translation target; when omitted, saved settings apply. `--locale en` changes CLI messages only.
+
+Local PDF input retains page sizes and count, and preserves images, vector graphics and formulas where possible. Failed or unfittable text stays unchanged and yields `partial`. Scans need OCR first. PDF inputs need no TeX compiler and do not export LaTeX source.
 
 ## Context guidance
 
@@ -93,7 +96,20 @@ texglot --show-config
 
 Plain `--configure` prompts for the endpoint, model and a hidden key. In scripts, set a secret environment variable and use `--key-env` to read it; avoid key literals in command arguments. `--show-config` reports only whether a key exists.
 
-`--provider qwen|deepseek|deepl|custom` is used with `--configure`. Qwen defaults to `qwen3.8-flash`; its initial configuration needs the OpenAI-compatible endpoint from your Alibaba workspace. Replace the workspace placeholder above. Switching to a previously saved provider restores its connection; a new endpoint never inherits another endpoint's key. An empty key preserves the saved key for the same address. `--configure --clear-key` removes only the current address's saved key.
+`--provider qwen|deepseek|deepl|custom` is used with `--configure`. Qwen defaults to `qwen3.8-flash`; its initial configuration needs the OpenAI-compatible endpoint from your Alibaba workspace. Replace the workspace placeholder above. Switching to a previously saved provider restores its connection; editing the current connection's address retains its key. An empty key keeps the selected connection's saved key. `--configure --clear-key` removes only the current address's saved key.
+
+Custom `--base-url` values support HTTP and HTTPS. Use the base URL (including `/v1` if needed) or the full `/chat/completions` endpoint for Chat Completions. Use the full `/messages` endpoint for the Anthropic Messages protocol:
+
+```bash
+texglot --configure --provider custom --base-url http://proxy.example:23000/v1/messages --model YOUR_MODEL --key-env MODEL_API_KEY --test
+```
+
+Use `--api-format chat_completions|messages` to choose the protocol explicitly with a base URL. Switch to a profile saved in the GUI by its name or ID:
+
+```bash
+texglot --configure --base-url http://proxy.example:23000/v1 --api-format messages
+texglot --configure --api-profile "Claude proxy"
+```
 
 DeepL does not need `--model`. Use `--deepl-source-language EN --deepl-glossary-id YOUR_GLOSSARY_ID` for an existing DeepL glossary; an empty string clears that setting. Batch JSON records cumulative DeepL usage in `characters`, with `characters_estimated` indicating a fallback estimate when billed counts are unavailable. `tokens` remains the LLM counter. Paragraph caches distinguish engines, source languages and glossaries; completed papers remain reusable under the library reuse rules.
 

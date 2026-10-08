@@ -17,10 +17,13 @@ from .config import (
     DATA,
     ROOT,
     Settings,
+    api_profiles,
+    delete_api_profile,
     load_settings,
     merge_settings,
     provider_options,
     public_settings,
+    save_api_profile,
     save_settings,
 )
 from .i18n import localize_payload
@@ -183,6 +186,31 @@ def providers_get():
     return provider_options()
 
 
+class APIProfileInput(BaseModel):
+    name: str
+    settings: dict
+
+
+@app.get("/api/profiles")
+def profiles_get():
+    return api_profiles()
+
+
+@app.post("/api/profiles", status_code=201)
+def profile_create(data: APIProfileInput):
+    return save_api_profile(data.name, data.settings)
+
+
+@app.put("/api/profiles/{profile_id}")
+def profile_update(profile_id: str, data: APIProfileInput):
+    return save_api_profile(data.name, data.settings, profile_id)
+
+
+@app.delete("/api/profiles/{profile_id}")
+def profile_delete(profile_id: str):
+    return public_settings(delete_api_profile(profile_id))
+
+
 @app.put("/api/settings")
 async def settings_put(request: Request):
     values = await request.json()
@@ -258,14 +286,19 @@ async def job_file(
 ):
     validate_language(language)
     name = file.filename or "source.zip"
-    if not name.lower().endswith((".zip", ".tar", ".tar.gz", ".tgz", ".gz", ".tex")):
-        raise HTTPException(400, "支持 .tex、.zip、.tar、.tar.gz 和 .tgz 源码文件")
+    is_pdf = name.lower().endswith(".pdf")
+    if not name.lower().endswith(
+        (".zip", ".tar", ".tar.gz", ".tgz", ".gz", ".tex", ".pdf")
+    ):
+        raise HTTPException(400, "支持 PDF、.tex 和 LaTeX 工程压缩包")
+    if is_pdf and main:
+        raise HTTPException(400, "PDF 输入不需要选择 LaTeX 主文件")
     blob = await file.read(MAX_UPLOAD + 1)
     await file.close()
     if not blob or len(blob) > MAX_UPLOAD:
         raise HTTPException(400, "文件为空或超过 80 MB")
     return manager.create(
-        "file",
+        "pdf" if is_pdf else "file",
         name,
         blob=blob,
         main=main,

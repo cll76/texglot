@@ -66,7 +66,7 @@ For a new provider, update backend recognition and presets, frontend presets and
 - **Source integrity:** preserve protected LaTeX syntax, math, citations and asset files. Failed segment validation must be visible; do not label mixed failed output as fully translated.
 - **Reader behavior:** use shared content destinations and local interpolation for synchronization. Enabling sync follows the translated pane; entering comparison follows the previously visible document; leaving comparison preserves the selected pane. Preserve anchors across resize and zoom. Render only nearby page canvases.
 - **Annotations:** store normalized page coordinates and the PDF's SHA-256 version in `reader.json`. Retain revision checks and reversible deletion. Never embed annotations in exported PDFs or source archives.
-- **Privacy:** never log keys or send one endpoint's credentials to another. Keep configurations, task files, PDFs, caches and annotations out of commits and fixtures. Use synthetic inputs and mocked providers in automated tests.
+- **Privacy:** never log or return saved keys. Editing the current connection's address retains its key; switching profiles loads their own credentials. Keep configurations, task files, PDFs, caches and annotations out of commits and fixtures. Use synthetic inputs and mocked providers in automated tests.
 - **Localization and platforms:** update both UI languages. Keep UI locale independent of the translation target. Use UTF-8 explicitly and platform helpers for paths, locks and subprocess cleanup; avoid introducing shell-specific runtime assumptions.
 
 ## Validate your change

@@ -1,8 +1,13 @@
 import { getLocale, translate } from "./i18n";
+import type { APIFormat, ProviderId } from "./providers";
 export type Settings = {
   base_url: string;
   model: string;
   api_key?: string;
+  api_format: APIFormat;
+  api_profile_id: string;
+  clear_api_key?: boolean;
+  provider?: ProviderId;
   has_api_key?: boolean;
   target_language: string;
   context_guidance: boolean;
@@ -70,6 +75,8 @@ export const statusNames: Record<string, string> = {
 export const defaults: Settings = {
   base_url: "https://api.deepseek.com",
   model: "deepseek-flash",
+  api_format: "chat_completions",
+  api_profile_id: "",
   target_language: "简体中文",
   context_guidance: true,
   concurrency: 3,

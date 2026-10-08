@@ -18,6 +18,79 @@ async def notify(_):
     pass
 
 
+async def test_denied_macos_sandbox_has_actionable_error_and_does_not_retry_unisolated(
+    tmp_path, monkeypatch
+):
+    import asyncio
+
+    from app import compiler
+
+    root = tmp_path / "source"
+    root.mkdir()
+    (root / "main.tex").write_text(
+        r"\documentclass{article}\begin{document}Text.\end{document}"
+    )
+    calls = []
+
+    async def spawn(*command, cwd, env, **kwargs):
+        calls.append(command)
+        assert cwd == root and command[-1] == "main.tex"
+        assert "-no-shell-escape" in command and env["openin_any"] == "p"
+        stream = asyncio.StreamReader()
+        stream.feed_data(b"sandbox-exec: sandbox_apply: Operation not permitted\n")
+        stream.feed_eof()
+
+        class Process:
+            stdout = stream
+            returncode = None
+
+            async def wait(self):
+                self.returncode = 1
+
+        return Process()
+
+    monkeypatch.setattr(compiler, "find_compiler", lambda name: "/compiler/" + name)
+    monkeypatch.setattr(
+        compiler,
+        "sandbox_command",
+        lambda command, *_: ["/usr/bin/sandbox-exec", "-p", "profile", *command],
+    )
+    monkeypatch.setattr(compiler.asyncio, "create_subprocess_exec", spawn)
+    with pytest.raises(ValueError, match="系统终端"):
+        await compiler.compile_pdf(
+            root, "main.tex", tmp_path / "out", "xelatex", notify
+        )
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize("font", ["", r"\setmathfont{LibertinusMath-Regular.otf}"])
+async def test_unicode_math_symbols_survive_flexisym_loaded_by_breqn(tmp_path, font):
+    if not find_compiler("xelatex"):
+        pytest.skip("Optional native XeLaTeX not installed")
+    root = tmp_path / "source"
+    root.mkdir()
+    source = (
+        r"\documentclass{article}\usepackage{unicode-math}"
+        + font
+        + r"\usepackage{breqn}\begin{document}Author $^{\dagger}$. Body $x=2$."
+        r"\begin{list}{$\bullet$}{}\item Negative values: $-$3.7, $-$7.6, $-$53.2."
+        r"\end{list}\begin{dmath}y=x-3.7\end{dmath}\end{document}"
+    )
+    prepared = normalize_engine(source, "xelatex")
+    assert normalize_engine(prepared, "xelatex") == prepared
+    (root / "main.tex").write_text(prepared, encoding="utf-8")
+    pdf, warnings = await compile_pdf(
+        root, "main.tex", tmp_path / "build", "xelatex", notify
+    )
+    assert len(PdfReader(pdf).pages) == 1
+    text = PdfReader(pdf).pages[0].extract_text()
+    assert "Author" in text and "Body" in text
+    assert "−" in text and any(char in text for char in "•∙")
+    assert "\x00" not in text and "\x0f" not in text
+    assert "Missing character:" not in (tmp_path / "build/compile.log").read_text()
+    assert warnings == []
+
+
 async def test_new_compile_does_not_execute_stale_template_auxiliary_files(tmp_path):
     if not find_compiler("tectonic"):
         pytest.skip("Optional native Tectonic not installed")

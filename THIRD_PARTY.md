@@ -6,6 +6,8 @@
 - HTTPX — BSD-3-Clause — https://github.com/encode/httpx
 - Pydantic — MIT — https://github.com/pydantic/pydantic
 - pypdf — BSD-3-Clause — https://github.com/py-pdf/pypdf
+- PyMuPDF / MuPDF — GNU AGPL-3.0-or-later or commercial license — https://pymupdf.readthedocs.io/ ; used for local PDF text extraction and layout-preserving replacement. Distributions that include this dependency must comply with its AGPL terms or obtain a commercial license; its source and license are available from https://github.com/pymupdf/PyMuPDF and https://mupdf.com/ .
+- fontTools — MIT — https://github.com/fonttools/fonttools ; subsets embedded PDF fonts while preserving CFF outlines and metrics.
 - pylatexenc — MIT — https://github.com/phfaist/pylatexenc ; standard Unicode-to-LaTeX math encodings for generated prose.
 - PDF.js (`pdfjs-dist`) — Apache-2.0 — https://github.com/mozilla/pdf.js
 - Lucide — ISC — https://github.com/lucide-icons/lucide
@@ -27,6 +29,6 @@ The frontend build retains full React, React DOM, Scheduler, Lucide and PDF.js l
 
 README reader screenshots show excerpts of the original text and a TeXGlot-generated Chinese translation from *Attention Is All You Need*, Ashish Vaswani et al., NeurIPS 2017, [arXiv:1706.03762v7](https://arxiv.org/abs/1706.03762v7). The screenshots illustrate corresponding prose and experiment tables; the machine translation is not an official translation of the paper. The walkthrough and default example fetch the paper from arXiv at run time; the full paper and source are not bundled. Research papers are not relicensed under Apache 2.0.
 
-Desktop versions are locked in `desktop/package-lock.json`. Desktop packages retain Python and dependency notices in `THIRD_PARTY_NOTICES.txt`, the compiler license, and `LICENSES.chromium.html` extracted from the checksum-verified Electron distribution. The app Help menu opens these notices. PyInstaller is used under its bootloader exception; the TeXGlot application remains Apache-2.0.
+Desktop versions are locked in `desktop/package-lock.json`. Desktop packages retain Python and dependency notices in `THIRD_PARTY_NOTICES.txt`, the compiler license, and `LICENSES.chromium.html` extracted from the checksum-verified Electron distribution. The app Help menu opens these notices. PyInstaller is used under its bootloader exception. TeXGlot source remains Apache-2.0; distributing a combined application that includes PyMuPDF/MuPDF also requires compliance with that component's AGPL terms or a commercial license.
 
 Ghostscript is an optional, separately installed EPS-to-PDF command-line converter (GNU AGPL / commercial licensing). TeXGlot does not bundle it or link to its libraries. Upstream: https://www.ghostscript.com/ .

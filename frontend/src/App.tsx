@@ -104,7 +104,10 @@ function JobDetail({
       <header>
         <div>
           <p>
-            {job.main || t("正在识别主文件")} · {t(job.language)}
+            {job.kind === "pdf"
+              ? t("本地 PDF")
+              : job.main || t("正在识别主文件")}{" "}
+            · {t(job.language)}
           </p>
         </div>
         <button className="icon-button" onClick={onClose} title={t("收起详情")}>
@@ -112,19 +115,22 @@ function JobDetail({
         </button>
       </header>
       <div className="pipeline">
-        {[t("获取源码"), t("检查排版"), t("段落翻译"), t("生成 PDF")].map(
-          (s, i) => {
-            const n = job.progress;
-            const done = n >= [10, 25, 88, 100][i];
-            const current = n >= [0, 10, 25, 88][i] && !done;
-            return (
-              <div className={done ? "done" : current ? "current" : ""} key={s}>
-                <span>{done ? <Check size={12} /> : i + 1}</span>
-                {s}
-              </div>
-            );
-          },
-        )}
+        {[
+          t(job.kind === "pdf" ? "提取文字" : "获取源码"),
+          t("检查排版"),
+          t("段落翻译"),
+          t("生成 PDF"),
+        ].map((s, i) => {
+          const n = job.progress;
+          const done = n >= [10, 25, 88, 100][i];
+          const current = n >= [0, 10, 25, 88][i] && !done;
+          return (
+            <div className={done ? "done" : current ? "current" : ""} key={s}>
+              <span>{done ? <Check size={12} /> : i + 1}</span>
+              {s}
+            </div>
+          );
+        })}
       </div>
       <div className="detail-status">
         <span className={"badge " + job.status}>
@@ -144,7 +150,7 @@ function JobDetail({
           <b>
             {job.done} <small>/ {job.total || "—"}</small>
           </b>
-          {t("段落已处理")}
+          {t(job.kind === "pdf" ? "文本块已处理" : "段落已处理")}
         </span>
         <span>
           <b>
@@ -273,7 +279,11 @@ function JobDetail({
               {l.message}
             </p>
           ))}
-          <a href={artifactURL(job, "log", true)}>{t("下载编译日志")}</a>
+          {(job.kind !== "pdf" || job.artifacts.log) && (
+            <a href={artifactURL(job, "log", true)}>
+              {t(job.kind === "pdf" ? "下载处理日志" : "下载编译日志")}
+            </a>
+          )}
         </div>
       )}
     </section>
@@ -430,7 +440,7 @@ export default function App() {
       return;
     }
     if (!example && tab === "file" && !file) {
-      setError("请先选择 LaTeX 源码文件");
+      setError("请先选择 PDF 或 LaTeX 源码文件");
       return;
     }
     setBusy(true);
@@ -472,11 +482,11 @@ export default function App() {
   const chooseFile = (f: File | undefined) => {
     if (!f) return;
     if (f.size > 80 * 1024 * 1024) {
-      setError("文件超过 80 MB，请精简源码包后重试");
+      setError("文件超过 80 MB，请精简文件后重试");
       return;
     }
-    if (!/\.(tex|zip|tar|tar\.gz|tgz|gz)$/i.test(f.name)) {
-      setError("请选择 .tex 或 LaTeX 源码压缩包");
+    if (!/\.(pdf|tex|zip|tar|tar\.gz|tgz|gz)$/i.test(f.name)) {
+      setError("请选择 PDF、.tex 或 LaTeX 源码压缩包");
       return;
     }
     setFile(f);
@@ -593,7 +603,9 @@ export default function App() {
             <>
               <section className="page-intro">
                 <h1>{t("翻译论文")}</h1>
-                <p>{t("导入 arXiv 链接或 LaTeX 源码，生成翻译后的 PDF。")}</p>
+                <p>
+                  {t("导入 arXiv、本地 PDF 或 LaTeX 源码，生成翻译后的 PDF。")}
+                </p>
               </section>
               <section className="input-card">
                 <SelectionGroup
@@ -630,7 +642,7 @@ export default function App() {
                     }}
                   >
                     <FileArchive size={17} />
-                    {t("LaTeX 源码")}
+                    {t("本地文件")}
                   </button>
                 </SelectionGroup>
                 <div
@@ -668,13 +680,13 @@ export default function App() {
                         className="hidden-input"
                         ref={input}
                         type="file"
-                        accept=".tex,.zip,.tar,.tar.gz,.tgz,.gz"
+                        accept=".pdf,.tex,.zip,.tar,.tar.gz,.tgz,.gz"
                         onChange={(e) => chooseFile(e.target.files?.[0])}
                       />
                       <div
                         role="button"
                         tabIndex={0}
-                        aria-label={t("选择或拖放 LaTeX 源码")}
+                        aria-label={t("选择或拖放 PDF 或 LaTeX 源码")}
                         className={
                           "upload-zone " +
                           (dragging ? "dragging" : "") +
@@ -709,15 +721,26 @@ export default function App() {
                           <>
                             <UploadCloud size={30} />
                             <strong>
-                              {t("拖放源码到这里，或")}
+                              {t("拖放文件到这里，或")}
                               <span>{t("选择文件")}</span>
                             </strong>
-                            <span>{t(".tex、.zip、.tar.gz · 最大 80 MB")}</span>
+                            <span>
+                              {t(".pdf、.tex、.zip、.tar.gz · 最大 80 MB")}
+                            </span>
                           </>
                         )}
                       </div>
                       <p className="upload-tip">
-                        {t("多文件工程请连同图片、参考文献和模板一起打包。")}
+                        {t(
+                          "支持可提取文字的 PDF。LaTeX 多文件工程请连同图片、参考文献和模板一起打包。",
+                        )}
+                        {file?.name.toLowerCase().endsWith(".pdf") && (
+                          <small>
+                            {t(
+                              "PDF 保留图片及图内文字，只翻译图外文本。扫描版需先做 OCR；放不下的译文会保留原文并提示。",
+                            )}
+                          </small>
+                        )}
                       </p>
                     </>
                   )}
@@ -773,22 +796,26 @@ export default function App() {
                 </button>
                 <span>{t("文件与任务保存在本机")}</span>
               </div>
-              {(!compilerReady || !settings.has_api_key) && health && (
-                <div className="setup-hint">
-                  <Settings2 size={16} />
-                  <span>
-                    {!compilerReady
-                      ? t("还需要安装编译器。macOS：brew install tectonic")
-                      : !settings.has_api_key
-                        ? t("连接翻译服务后，即可开始翻译。")
-                        : ""}
-                  </span>
-                  <button onClick={() => setShowSettings(true)}>
-                    {t("检查设置")}
-                    <ArrowRight size={13} />
-                  </button>
-                </div>
-              )}
+              {((!compilerReady &&
+                !file?.name.toLowerCase().endsWith(".pdf")) ||
+                !settings.has_api_key) &&
+                health && (
+                  <div className="setup-hint">
+                    <Settings2 size={16} />
+                    <span>
+                      {!compilerReady &&
+                      !file?.name.toLowerCase().endsWith(".pdf")
+                        ? t("还需要安装编译器。macOS：brew install tectonic")
+                        : !settings.has_api_key
+                          ? t("连接你的模型 API 后，即可开始翻译。")
+                          : ""}
+                    </span>
+                    <button onClick={() => setShowSettings(true)}>
+                      {t("检查设置")}
+                      <ArrowRight size={13} />
+                    </button>
+                  </div>
+                )}
             </>
           ) : (
             <section className="library-hero">

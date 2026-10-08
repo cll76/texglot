@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+- Restore Unicode bullet and minus mappings when breqn/flexisym is loaded after unicode-math, retaining list markers and negative table values in XeTeX PDFs. / 在 unicode-math 后加载 breqn/flexisym 时恢复 Unicode 圆点和负号映射，修复 XeTeX 输出中的列表标记缺失及表格负数丢失负号。
+- Locate corresponding paragraphs in the original and translated PDFs using their saved LaTeX sources, improving comparison scrolling when language lengths change pagination without retranslating or changing PDF layout. / 利用已有 LaTeX 源码定位原文与译文 PDF 中的对应段落，改善中英文长度变化、分页不同造成的对照滚动错位，无需重新翻译或修改 PDF 排版。
+- Preserve unicode-math's math strut when flexisym is loaded through breqn under XeTeX, allowing author superscripts and body formulas to compile in affected templates. / 在 XeTeX 下通过 breqn 加载 flexisym 时保留 unicode-math 的数学支撑定义，修复相关模板作者上标及正文公式的编译冲突。
+- Pass classic TeX engines a main filename relative to their working directory under `openin_any=p`, and explain macOS sandbox launch denials without disabling compiler isolation. / 在 `openin_any=p` 下以工作目录相对文件名调用 XeLaTeX/LuaLaTeX，修复绝对主文件路径被拒绝；明确提示 macOS 编译沙箱启动受限，保留编译隔离。
+- Reconstruct PDF lines across font changes before grouping paragraphs, merge overlapping source regions, and remove only the original text lines before inserting translations. Continue sentences below page-top figures/captions and across preserved display formulas. / 按实际行位置合并不同字体的文字，修复行内小标题造成的半句分块和重叠排版；仅移除原文字行，正文跨页遇到图片、图注或独立公式仍保持连续翻译。
+- Keep embedded pictures and vector-figure labels in their original language when translating local PDFs; translate surrounding prose and captions, and exclude figure text from model requests and progress counts. / 本地 PDF 翻译保留图片和矢量图内文字原样，图外正文及图注照常翻译，图内文本不送模型也不计入翻译进度。
+- Translate continuous PDF paragraphs across page/column boundaries in one request, reconstruct broken words, keep numbered/formula tokens scoped to their original regions, and preserve unchanged standalone caches. Label PDF progress as text blocks. / 跨页、跨栏的连续 PDF 正文合并请求，恢复断词，按原文本区域返回译文并保护数字和公式；复用未变化的独立块缓存，PDF 进度明确标为文本块。
+- Crop TeX combining negation marks together with their relation glyphs, and leave standalone formulas intact without rasterizing them, fixing PDF extraction failures from zero-width formula spans. / 将 TeX 零宽否定叠加笔画与相邻关系符号一起裁图，独立公式直接保留而不生成图片，修复 PDF 提取阶段的零宽公式裁图失败。
+- Translate local text PDFs in place, retaining page geometry, images, vector graphics and protected formula artwork. Support GUI and CLI uploads, resume caches and comparison reading; retain original blocks when translation fails or cannot fit, and explain unsupported scans/encryption. / 支持网页和 CLI 上传本地文字 PDF，在原文本区域排版译文，保留页面、图片、图形和受保护的公式；支持缓存恢复与对照阅读，翻译失败或放不下时保留原文，并提示扫描版和加密文件限制。
+- Give connection probes more output budget so models with reasoning can finish the short translation instead of reporting a false connection failure. / 增加连接测试的输出额度，使带推理过程的模型能完成简短译文，避免截断导致连接失败的误报。
+- Add an explicit API protocol selector and named, locally saved connection profiles with independent keys, models and request settings. Retain keys while editing an endpoint, and restore each profile's own key when switching. / 新增接口类型选择与可命名、保存、切换的本地 API 配置，各自保存密钥、模型和请求设置；编辑地址时保留密钥，切换配置时加载各自密钥。
+- Support full Anthropic Messages endpoints alongside Chat Completions, including native authentication, system prompts, text-block responses and token accounting in the GUI and CLI. / 网页和 CLI 支持完整 Anthropic Messages 接口地址，与 Chat Completions 并存；适配鉴权、系统提示、文本块响应与 token 统计。
+- Accept remote HTTP endpoints for custom and reverse-proxy model services, alongside HTTPS and local HTTP endpoints. / 支持自定义模型与反代服务使用远程 HTTP 地址，继续支持 HTTPS 与本地 HTTP 地址。
+
 ## 1.2.1 — 2026-10-08
 
 - Use locally bundled Qwen, DeepSeek and DeepL brand icons in translation settings. / 翻译设置改用随应用打包的 Qwen、DeepSeek 和 DeepL 品牌图标。

@@ -79,6 +79,76 @@ async def test_non_thinking_and_json_mode_stay_on_official_hosts(url, model, pro
         await t.close()
 
 
+@pytest.mark.parametrize(
+    "input_path,stored_path,request_path",
+    [
+        ("/v1", "/v1", "/v1/chat/completions"),
+        ("/v1/chat/completions", "/v1", "/v1/chat/completions"),
+        ("/v1/messages", "/v1", "/v1/messages"),
+    ],
+)
+async def test_remote_http_proxy_can_save_and_test_connection(
+    tmp_path, monkeypatch, input_path, stored_path, request_path
+):
+    import app.main as main
+
+    monkeypatch.setattr(config, "CONFIG", tmp_path / "settings.json")
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        if request_path.endswith("/messages"):
+            return httpx.Response(
+                200,
+                json={
+                    "content": [{"type": "text", "text": "实验证实了假设。"}],
+                    "usage": {"input_tokens": 7, "output_tokens": 5},
+                },
+            )
+        return httpx.Response(
+            200,
+            json={
+                "choices": [{"message": {"content": "实验证实了假设。"}}],
+                "usage": {"total_tokens": 12},
+            },
+        )
+
+    class ProxyTranslator(Translator):
+        async def test(self):
+            await self.client.aclose()
+            self.client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+            return await super().test()
+
+    monkeypatch.setattr(main, "Translator", ProxyTranslator)
+    values = {
+        "base_url": "http://192.0.2.10:23000" + input_path,
+        "model": "proxy-model",
+        "api_key": "fake-proxy-key",
+    }
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=main.app), base_url="http://testserver"
+    ) as client:
+        saved = await client.put("/api/settings", json=values)
+        assert saved.status_code == 200
+        assert saved.json()["base_url"] == "http://192.0.2.10:23000" + stored_path
+        assert saved.json()["has_api_key"] is True
+        assert "api_key" not in saved.json()
+        tested = await client.post(
+            "/api/settings/test", json={"base_url": values["base_url"], "api_key": ""}
+        )
+        assert tested.status_code == 200 and tested.json()["ok"] is True
+        assert tested.json()["tokens"] == 12
+    assert len(calls) == 1
+    assert str(calls[0].url) == "http://192.0.2.10:23000" + request_path
+    if request_path.endswith("/messages"):
+        assert calls[0].headers["x-api-key"] == "fake-proxy-key"
+        assert calls[0].headers["anthropic-version"] == "2023-06-01"
+        assert "Authorization" not in calls[0].headers
+    else:
+        assert calls[0].headers["Authorization"] == "Bearer fake-proxy-key"
+    assert json.loads(calls[0].content)["model"] == "proxy-model"
+
+
 def test_provider_switch_remembers_exact_endpoint_keys_without_exposing_them(
     tmp_path, monkeypatch
 ):
@@ -91,8 +161,20 @@ def test_provider_switch_remembers_exact_endpoint_keys_without_exposing_them(
     assert qwen.model == "qwen3.8-flash"
     assert save_settings({"provider": "deepseek"}).api_key == "deep-private-key"
     assert save_settings({"provider": "qwen"}).api_key == "qwen-private-key"
-    assert merge_settings(qwen, {"base_url": URL + "/another"}).api_key == ""
-    assert merge_settings(qwen, {"base_url": "https://other.example/v1"}).api_key == ""
+    assert (
+        merge_settings(
+            deep, {"provider": "qwen", "base_url": "http://new-proxy.example/v1"}
+        ).api_key
+        == "qwen-private-key"
+    )
+    assert (
+        merge_settings(qwen, {"base_url": URL + "/another"}).api_key
+        == "qwen-private-key"
+    )
+    assert (
+        merge_settings(qwen, {"base_url": "https://other.example/v1"}).api_key
+        == "qwen-private-key"
+    )
     public = json.dumps(provider_options())
     assert "private-key" not in public and '"api_key"' not in public
     assert all(

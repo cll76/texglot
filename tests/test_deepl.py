@@ -371,7 +371,10 @@ def test_settings_switch_key_isolation_and_validation(tmp_path, monkeypatch):
     assert t.model == "DeepL" and t.glossary == "attention = 注意力"
     assert save_settings({"provider": "deepseek"}).api_key == "llm-private"
     assert save_settings({"provider": "deepl"}).api_key == "deepl-private"
-    assert merge_settings(t, {"base_url": "https://evil.example"}).api_key == ""
+    assert (
+        merge_settings(t, {"base_url": "https://proxy.example"}).api_key
+        == "deepl-private"
+    )
     assert "private" not in json.dumps(public_settings(t))
     assert (
         Settings(base_url="https://api.deepl.com/v2/translate").base_url

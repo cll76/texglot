@@ -12,8 +12,9 @@ from pathlib import Path
 from pypdf import PdfReader
 
 from .figure_alignment import match_figure_regions
+from .paragraph_alignment import paragraph_pairs
 
-VERSION = 2
+VERSION = 3
 
 
 def geometry(page):
@@ -96,7 +97,13 @@ def ordered_pairs(candidates):
     return list(reversed(chain))
 
 
-def build_alignment(original: Path, translated: Path, versions: dict):
+def build_alignment(
+    original: Path,
+    translated: Path,
+    versions: dict,
+    source_files: tuple[str, ...] = (),
+    dependencies: tuple[str, ...] = (),
+):
     readers = {"original": PdfReader(original), "translated": PdfReader(translated)}
     heights = {
         side: [geometry(page)[2] for page in reader.pages]
@@ -116,8 +123,9 @@ def build_alignment(original: Path, translated: Path, versions: dict):
         }
         if all(positions.values()):
             candidates.append({"id": name, "weight": weight, **positions})
-    pairs = ordered_pairs(candidates)
     regions = match_figure_regions(readers, candidates)
+    candidates.extend(paragraph_pairs(original, translated, source_files, dependencies))
+    pairs = ordered_pairs(candidates)
     return {
         "version": VERSION,
         "kind": "landmarks" if pairs else "pages",
@@ -130,10 +138,17 @@ def build_alignment(original: Path, translated: Path, versions: dict):
 
 @lru_cache(maxsize=16)
 def cached_alignment(
-    original: str, translated: str, original_version: str, translated_version: str
+    original: str,
+    translated: str,
+    original_version: str,
+    translated_version: str,
+    source_files: tuple[str, ...] = (),
+    dependencies: tuple[str, ...] = (),
 ):
     return build_alignment(
         Path(original),
         Path(translated),
         {"original": original_version, "translated": translated_version},
+        source_files,
+        dependencies,
     )

@@ -3,6 +3,7 @@
 import re
 
 MESSAGES = {
+    "本地 PDF 翻译请使用大模型接口；DeepL 支持 arXiv 和 LaTeX 源码": "Use an LLM API for local PDF translation; DeepL supports arXiv and LaTeX sources",
     "DeepL 请使用官方 HTTPS API 地址": "Use an official DeepL HTTPS API endpoint",
     "请输入有效的 DeepL 源语言代码，例如 EN": "Enter a valid DeepL source language code, such as EN",
     "请输入有效的 DeepL 术语表 ID": "Enter a valid DeepL glossary ID",
@@ -19,6 +20,22 @@ MESSAGES = {
     "DeepL 修改、遗漏或重复了受保护标记": "DeepL changed, omitted or duplicated a protected marker",
     "段落超过 DeepL 单次请求大小限制": "The paragraph exceeds the DeepL request size limit",
     "段落包含无法发送至 DeepL 的 XML 字符": "The paragraph contains XML characters unsupported by DeepL",
+    "当前启动环境不允许 macOS 编译沙箱，请在系统终端中启动 TeXGlot 后重试": "The launch environment does not allow the macOS compiler sandbox. Start TeXGlot from the system terminal, then retry",
+    "图片区域已保留，无需翻译": "Figure regions were kept unchanged; no translation needed",
+    "支持 PDF、.tex 和 LaTeX 工程压缩包": "Supports PDF, .tex and LaTeX project archives",
+    "PDF 输入不需要选择 LaTeX 主文件": "PDF input does not use a LaTeX main file",
+    "无法读取 PDF，请确认文件未损坏": "Cannot read the PDF. Check that the file is not damaged",
+    "文件不是有效的 PDF 或没有页面": "The file is not a valid PDF or has no pages",
+    "PDF 已加密，请先解除密码后再上传": "The PDF is encrypted. Remove its password before uploading",
+    "PDF 没有可提取的正文，扫描版需要先做 OCR 后再上传": "The PDF has no extractable body text. Run OCR on scans before uploading",
+    "正在提取 PDF 正文与公式位置": "Extracting PDF text and formula positions",
+    "正在原 PDF 页面中排版译文，保留图片与公式": "Fitting translated text into the original PDF pages, preserving images and formulas",
+    "公式或数字标记被修改、遗漏或重复": "Formula or number markers were changed, omitted or duplicated",
+    "模型未将正文翻译为英文": "The model did not translate the body into English",
+    "译文排版失败，原 PDF 已保留，请重试": "Translation layout failed. The original PDF is preserved; retry the task",
+    "API 配置不存在": "API profile not found",
+    "请输入 1 至 80 字符的 API 配置名称": "Enter an API profile name between 1 and 80 characters",
+    "API 配置名称已存在，请使用其他名称": "An API profile with this name already exists; choose another name",
     "命名标识符与相邻文字错误拼接": "A named identifier was incorrectly joined to adjacent text",
     "部分图表超出页高，已整体缩放以保留全部内容、标签和图表说明": "Some figures or tables exceeded the page height and were scaled together to preserve all content, labels, and captions.",
     "存在超出页高的浮动体，内容可能被裁切；请检查图表及编译日志": "Some floats still exceed the page height and may be clipped. Check the figures, tables, and compilation log.",
@@ -80,6 +97,7 @@ MESSAGES = {
     "模型没有返回有效文本": "The model returned no valid text",
     "API 连接超时或网络不可达，请检查网络和 Base URL": "API timed out or is unreachable. Check your network and base URL",
     "API 返回格式不兼容，需要 Chat Completions 接口": "Incompatible API response. A Chat Completions endpoint is required",
+    "API 返回格式不兼容，需要 Messages 接口": "Incompatible API response. An Anthropic Messages endpoint is required",
     "模型请求失败": "Model request failed",
     "上次服务停止，译文已保存，点击继续即可恢复": "Service stopped previously. Translations are saved; resume to continue",
     "等待开始": "Waiting to start",
@@ -146,6 +164,43 @@ MESSAGES = {
     "译文异常短，可能遗漏正文": "Translation is unusually short and may omit content",
 }
 RULES = [
+    (r"正在翻译 · (\d+) / (\d+) 文本块", r"Translating · \1 / \2 text blocks"),
+    (
+        r"按连续正文组织为 (\d+) 个翻译请求组，跨页段落一起翻译",
+        r"Organized into \1 translation request groups; cross-page paragraphs are translated together",
+    ),
+    (
+        r"公式或数字标记跨越了 PDF 文本区域",
+        r"Formula or number markers crossed PDF text regions",
+    ),
+    (
+        r"模型没有返回有效的 PDF 分区译文 JSON",
+        r"The model did not return valid PDF region translation JSON",
+    ),
+    (
+        r"PDF 分区译文遗漏或增加了文本区域",
+        r"PDF region translations omitted or added text regions",
+    ),
+    (
+        r"已提取 (\d+) 个 PDF 文本块，保留原页面图片和图形",
+        r"Extracted \1 PDF text blocks, retaining images and graphics",
+    ),
+    (
+        r"PDF 第 (\d+) 页有文字翻译失败，保留原文",
+        r"Text on PDF page \1 failed translation and remains in the original language",
+    ),
+    (
+        r"(\d+) 个 PDF 文本块未通过翻译检查，已保留原文",
+        r"\1 PDF text blocks failed translation checks and remain in the original language",
+    ),
+    (
+        r"(\d+) 个 PDF 文本块的译文放不下，已保留原文",
+        r"\1 translated PDF text blocks could not fit and remain in the original language",
+    ),
+    (
+        r"以下 PDF 页面没有可提取的正文，已保留原页：(.+)",
+        r"These PDF pages have no extractable body text and were kept unchanged: \1",
+    ),
     (
         r"已按编译诊断调整 (.+) 宏包选项，正在重试",
         r"Retrying with compiler-guided options for \1",

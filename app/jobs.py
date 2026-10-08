@@ -59,7 +59,7 @@ from .translation import Translator, cache_settings
 JOBS = DATA / "jobs"
 JOBS.mkdir(exist_ok=True)
 ACTIVE = {"queued", "downloading", "preparing", "translating", "compiling"}
-SOURCE_PREPARATION_VERSION = "native-source-v3"
+SOURCE_PREPARATION_VERSION = "native-source-v4"
 TITLE_METADATA_VERSION = 3
 
 
@@ -383,6 +383,14 @@ class JobManager:
             and not settings.api_key.strip()
         ):
             raise ProviderError("请在翻译设置中填写 DeepL API key")
+        if job["kind"] == "pdf":
+            if provider_for_url(settings.base_url) == "deepl":
+                raise ProviderError(
+                    "本地 PDF 翻译请使用大模型接口；DeepL 支持 arXiv 和 LaTeX 源码"
+                )
+            from .pdf_translation import run_pdf_job
+
+            return await run_pdf_job(self, job, settings, JOBS / job["id"])
         separate_layout_notices(job)
         folder = JOBS / job["id"]
         source = folder / "source"
